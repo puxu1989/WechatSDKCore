@@ -38,10 +38,10 @@ namespace WechatSDKCore.MPManager
         public async Task<WechatUserInfoModel> GetDecryptUserInfoAsync(EncryptedLoginInfoModel input)
         {
             if (input == null)
-                throw new Exception("loginInfo不能为空");
+                throw new Exception("获取登录信息请求数据不能为空");
             OpenIdAndSessionKeyModel model =await GetOpenIdAndSessionKeyAsync(input.code);
             if(!string.IsNullOrEmpty(model.errmsg))
-                throw new Exception($"授权登录失败,code:{model.errcode} 信息:{model.errmsg}");
+                throw new Exception($"获取session_key失败,code:{model.errcode} 信息:{model.errmsg}");
             if (!VaildateSignature(input.rawData,input.signature, model.session_key))
                 throw new Exception("signature校验失败");
             string result = SecurityHelper.AESDecryptString(input.encryptedData, input.iv, model.session_key);
@@ -59,6 +59,15 @@ namespace WechatSDKCore.MPManager
         {
             return SecurityHelper.GetSHA1(rawData + sessionKey, Encoding.UTF8)==signature.ToLower();
         }
-
+        public async Task<PhoneNumModel> GetDecryptPhoneNumAsync(EncryptedPhoneNumModel input)
+        {
+            if (input == null)
+                throw new Exception("获取手机号请求数据不能为空");
+            OpenIdAndSessionKeyModel model = await GetOpenIdAndSessionKeyAsync(input.code);
+            if (!string.IsNullOrEmpty(model.errmsg))
+                throw new Exception($"获取session_key失败,code:{model.errcode} 信息:{model.errmsg}");
+            string result = SecurityHelper.AESDecryptString(input.encryptedData, input.iv, model.session_key);
+            return result.ToObject<PhoneNumModel>();
+        }
     }
 }
