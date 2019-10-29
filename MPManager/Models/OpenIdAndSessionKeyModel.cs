@@ -9,7 +9,7 @@ namespace WechatSDKCore.MPManager.Models
     {
         public string openid { get; set; }
         public string session_key { get; set; }
-        public string errcode { get; set; }
+        public int errcode { get; set; }//errcode=0成功
         public string errmsg { get; set; }
     }
 }

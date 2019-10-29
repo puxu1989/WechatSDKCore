@@ -22,12 +22,13 @@ namespace WechatSDKCore.MPManager
             this.AppSecret = appSecret;
         }
         /// <summary>
-        /// 小程序拉去加密的用户信息里的code换取session 
+        /// auth.code2Session 小程序拉去加密的用户信息里的code换取session 
         /// </summary> 
         private async Task<OpenIdAndSessionKeyModel> GetOpenIdAndSessionKeyAsync(string jscode) 
         {
             string postUrl = $"https://api.weixin.qq.com/sns/jscode2session?appid={this.AppId}&secret={this.AppSecret}&js_code={jscode}&grant_type=authorization_code";
             string res = await WebHelper.HttpPostAsync(postUrl);
+
             return res.ToObject<OpenIdAndSessionKeyModel>();
         }
         /// <summary>  
@@ -40,7 +41,7 @@ namespace WechatSDKCore.MPManager
             if (input == null)
                 throw new Exception("获取登录信息请求数据不能为空");
             OpenIdAndSessionKeyModel model =await GetOpenIdAndSessionKeyAsync(input.code);
-            if(!string.IsNullOrEmpty(model.errmsg))
+            if(model.errcode!=0)
                 throw new Exception($"获取session_key失败,code:{model.errcode} 信息:{model.errmsg}");
             if (!VaildateSignature(input.rawData,input.signature, model.session_key))
                 throw new Exception("signature校验失败");
@@ -64,7 +65,7 @@ namespace WechatSDKCore.MPManager
             if (input == null)
                 throw new Exception("获取手机号请求数据不能为空");
             OpenIdAndSessionKeyModel model = await GetOpenIdAndSessionKeyAsync(input.code);
-            if (!string.IsNullOrEmpty(model.errmsg))
+            if (model.errcode!=0)
                 throw new Exception($"获取session_key失败,code:{model.errcode} 信息:{model.errmsg}");
             string result = SecurityHelper.AESDecryptString(input.encryptedData, input.iv, model.session_key);
             return result.ToObject<PhoneNumModel>();
