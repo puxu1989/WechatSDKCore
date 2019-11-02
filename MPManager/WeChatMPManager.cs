@@ -28,7 +28,6 @@ namespace WechatSDKCore.MPManager
         {
             string postUrl = $"https://api.weixin.qq.com/sns/jscode2session?appid={this.AppId}&secret={this.AppSecret}&js_code={jscode}&grant_type=authorization_code";
             string res = await WebHelper.HttpPostAsync(postUrl);
-
             return res.ToObject<OpenIdAndSessionKeyModel>();
         }
         /// <summary>  
@@ -60,6 +59,11 @@ namespace WechatSDKCore.MPManager
         {
             return SecurityHelper.GetSHA1(rawData + sessionKey, Encoding.UTF8)==signature.ToLower();
         }
+        /// <summary>
+        /// 小程序获取手机号 需要认证的公众号才有权限
+        /// </summary>
+        /// <param name="input"></param>
+        /// <returns></returns>
         public async Task<PhoneNumModel> GetDecryptPhoneNumAsync(EncryptedPhoneNumModel input)
         {
             if (input == null)
