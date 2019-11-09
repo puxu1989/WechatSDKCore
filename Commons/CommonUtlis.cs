@@ -1,5 +1,6 @@
 ﻿using PXLibCore.Extensions.Json;
 using PXLibCore.Helpers;
+using System;
 using System.Text;
 using System.Threading.Tasks;
 using WechatSDKCore.Commons.Models;
@@ -38,6 +39,24 @@ namespace WechatSDKCore.Commons
             string param = "jsapi_ticket=" + ticket + "&noncestr=" + nonceStr + "&timestamp=" + timestamp + "&url=" + link;  //拼接字符串准备生成签名
             string signature = SecurityHelper.GetSHA1(param, Encoding.UTF8); //微信签名
             return signature;
+        }
+        //====================================支付使用====================================
+        /// <summary>  
+        /// 获取时间时间戳Timestamp  
+        /// </summary>  
+        /// <returns></returns>  
+        public static string GetTimestamp()
+        {
+            DateTime DateStart = new DateTime(1970, 1, 1, 8, 0, 0);
+            return Convert.ToInt64((DateTime.Now - DateStart).TotalSeconds).ToString();
+        }
+        /// <summary>
+        /// 获取随机字符
+        /// </summary>
+        /// <returns></returns>
+        public static string GetNonceStr() 
+        {
+           return Guid.NewGuid().ToString("N");//32位
         }
     }
 }
