@@ -1,8 +1,10 @@
-﻿using PXLibCore.Extensions.Json;
+﻿using PXLibCore.Extensions;
+using PXLibCore.Extensions.Json;
 using PXLibCore.Helpers;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
@@ -90,6 +92,13 @@ namespace WechatSDKCore.Commons
         public static string GetNonceStr() 
         {
            return Guid.NewGuid().ToString("N");//32位
+        }
+        public static string GetMD5Sign(PackageParamModel packageDic, string appKey)//这里就使用MD5加密 还有另外一个加密方式 HMAC-SHA256
+        {
+            string signStr = string.Join("&", packageDic.GetValues()
+                .Where(m => "sign".CompareTo(m.ToString()) != 0 && m.Value != null && (m.Value as string) != "")
+                .Select(m => m.Key + "=" + m.Value)) + "&key=" + appKey;//拼接加密参数
+            return signStr.ToMd5();
         }
     }
 }
