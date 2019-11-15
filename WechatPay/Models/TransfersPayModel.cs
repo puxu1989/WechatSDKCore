@@ -14,20 +14,21 @@ namespace WechatSDKCore.WechatPay.Models
 
         public int amount { get; set; }
 
-        public string partner_trade_no { get; set; }
+        public string partner_trade_no { get; set; }//商户订单号
 
-        public string re_user_name { get; set; }
+        public string re_user_name { get; set; }//收款用户名
 
-        public string spbill_create_ip { get; set; }
+        public string spbill_create_ip { get; set; }//可以为客户端或者服务端的IP
+        public string desc { get; set; }//必传 理赔 提现 转账等描述
 
         public PackageParamModel GetTransfersApiParameters()
         {
             PackageParamModel apiParam = new PackageParamModel();
             apiParam.AddValue("partner_trade_no", partner_trade_no);
             apiParam.AddValue("openid", openid);
-            apiParam.AddValue("check_name", "NO_CHECK");
+            apiParam.AddValue("check_name", "NO_CHECK");//如果是FORCE_CHECK re_user_name必须为真实姓名
             apiParam.AddValue("amount", amount);
-            apiParam.AddValue("desc", "提现");
+            apiParam.AddValue("desc", desc);
             apiParam.AddValue("spbill_create_ip", spbill_create_ip);
             apiParam.AddValue("re_user_name", re_user_name);
             return apiParam;

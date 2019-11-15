@@ -1,4 +1,5 @@
-﻿using PXLibCore.Helpers;
+﻿using PXLibCore.Extensions;
+using PXLibCore.Helpers;
 using System;
 using System.Threading.Tasks;
 using WechatSDKCore.Commons;
@@ -94,7 +95,7 @@ namespace WechatSDKCore.WechatPay
         }
         #endregion
         #region  提现转账
-        public async Task<PackageParamModel> SubmitTransfers(TransfersPayModel inputData)
+        public async Task<TransfersReturnModel> SubmitTransfers(TransfersPayModel inputData)
         {
             var url = "https://api.mch.weixin.qq.com/mmpaymkttransfers/promotion/transfers";
             PackageParamModel packageParam = inputData.GetTransfersApiParameters();
@@ -103,10 +104,20 @@ namespace WechatSDKCore.WechatPay
             packageParam.AddValue("nonce_str", CommonUtlis.GetNonceStr());//随机字符串
             packageParam.AddValue("sign", CommonUtlis.GetMD5Sign(packageParam, this._appKey));//签名
             string xmlPackage = packageParam.ToXml();
-            string response = await WebHelper.HttpPostCertAsync(url, xmlPackage,"","", 10);
+            string response = await WebHelper.HttpPostCertAsync(url, xmlPackage,"","", 10);//证书默认密码为微信商户号
             PackageParamModel newResult = new PackageParamModel();
             newResult.FromXml(response);
-            return newResult;
+            if (newResult.GetValue("result_code").ToString().ToUpper() == "SUCCESS")
+            {
+                TransfersReturnModel transfersReturnModel = new TransfersReturnModel
+                {
+                    partner_trade_no = newResult.GetValue("partner_trade_no").ToString(),
+                    payment_no = newResult.GetValue("payment_no").ToString(),
+                    payment_time = newResult.GetValue("payment_time").ToDate(),
+                };
+                return transfersReturnModel;
+            }
+            throw new WxPayException(inputData.desc + "操作失败");
         }
         #endregion
     }
