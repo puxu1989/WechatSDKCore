@@ -81,7 +81,7 @@ namespace WechatSDKCore.WechatPay
             packageDic.AddValue("timeStamp", timeStamp);
             packageDic.AddValue("nonceStr", nonceStr);
             packageDic.AddValue("package", prepay_id);
-            packageDic.AddValue("signType",this._signType);
+            packageDic.AddValue("signType", this._signType);
             var paySign = CommonUtlis.GetMD5Sign(packageDic, this._appKey);//坑1 APPKey可能也有错 
             PayReturnModel model = new PayReturnModel
             {
@@ -89,22 +89,22 @@ namespace WechatSDKCore.WechatPay
                 nonceStr = nonceStr,
                 package = prepay_id,
                 paySign = paySign,
-                signType =this._signType
+                signType = this._signType
             };
             return model;//最终返回前端的参数
         }
         #endregion
-        #region  提现转账
+        #region  提现转账到零钱
         public async Task<TransfersReturnModel> SubmitTransfers(TransfersPayModel inputData)
         {
             var url = "https://api.mch.weixin.qq.com/mmpaymkttransfers/promotion/transfers";
-            PackageParamModel packageParam = inputData.GetTransfersApiParameters();
+            PackageParamModel packageParam = inputData.GetApiParameters();
             packageParam.AddValue("mch_appid", this._appId);//公众账号ID?
             packageParam.AddValue("mchid", this._mchId);//商户号
             packageParam.AddValue("nonce_str", CommonUtlis.GetNonceStr());//随机字符串
             packageParam.AddValue("sign", CommonUtlis.GetMD5Sign(packageParam, this._appKey));//签名
             string xmlPackage = packageParam.ToXml();
-            string response = await WebHelper.HttpPostCertAsync(url, xmlPackage,"","", 10);//证书默认密码为微信商户号
+            string response = await WebHelper.HttpPostCertAsync(url, xmlPackage, "", "", 10);//证书默认密码为微信商户号
             PackageParamModel newResult = new PackageParamModel();
             newResult.FromXml(response);
             if (newResult.GetValue("result_code").ToString().ToUpper() == "SUCCESS")
@@ -117,8 +117,58 @@ namespace WechatSDKCore.WechatPay
                 };
                 return transfersReturnModel;
             }
-            throw new WxPayException(inputData.desc + "操作失败");
+            throw new WxPayException(newResult.GetValue("err_code_des").ToString());
         }
         #endregion
+        #region 企业付款到银行卡
+        public async Task<PayBankReturnModel> SubmitPayBank(PayBankModel inputData, string pubkey)
+        {
+            string url = "	https://api.mch.weixin.qq.com/mmpaysptrans/pay_bank";
+            PackageParamModel packageParam = inputData.GetApiParameters(pubkey);
+            packageParam.AddValue("mch_id", this._mchId);
+            packageParam.AddValue("nonce_str", CommonUtlis.GetNonceStr());
+            packageParam.AddValue("sign", CommonUtlis.GetMD5Sign(packageParam, this._appKey));
+            string xmlPackage = packageParam.ToXml();
+            string response = await WebHelper.HttpPostCertAsync(url, xmlPackage, "", "", 10);//证书默认密码为微信商户号
+            PackageParamModel newResult = new PackageParamModel();
+            newResult.FromXml(response);
+            if (newResult.GetValue("result_code").ToString().ToUpper() == "SUCCESS") 
+            {
+                PayBankReturnModel model = new PayBankReturnModel
+                {
+                    partner_trade_no = newResult.GetValue("partner_trade_no").ToString(),
+                    payment_no = newResult.GetValue("payment_no").ToString(),
+                    cmms_amt = (newResult.GetValue("cmms_amt").ToInt()/100).ToDecimal(2),
+                };
+                return model;
+            }
+            throw new WxPayException(newResult.GetValue("err_code_des").ToString());
+        }
+
+
+        #endregion
+
+        /// <summary>
+        /// 获取RSA加密公钥API
+        /// </summary>
+        /// <returns></returns>
+        public async Task<string> GetPublicKey()
+        {
+            string url = "https://fraud.mch.weixin.qq.com/risk/getpublickey";
+            PackageParamModel packageParam = new PackageParamModel();
+            packageParam.AddValue("mch_id", this._mchId);
+            packageParam.AddValue("nonce_str", CommonUtlis.GetNonceStr());
+            packageParam.AddValue("sign_type", this._signType);
+            packageParam.AddValue("sign", CommonUtlis.GetMD5Sign(packageParam, this._appKey));//签名
+            string xmlPackage = packageParam.ToXml();
+            string response = await WebHelper.HttpPostCertAsync(url, xmlPackage, "", "", 10);//证书默认密码为微信商户号
+            PackageParamModel newResult = new PackageParamModel();
+            newResult.FromXml(response);
+            if (newResult.GetValue("result_code").ToString().ToUpper() == "SUCCESS")
+            {
+                return newResult.GetValue("pub_key").ToString();
+            }
+            throw new WxPayException(newResult.GetValue("err_code_des").ToString());
+        }
     }
 }

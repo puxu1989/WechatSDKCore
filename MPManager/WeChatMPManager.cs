@@ -1,4 +1,6 @@
-﻿using PXLibCore.Extensions.Json;
+﻿using Newtonsoft.Json.Linq;
+using PXLibCore.Extensions;
+using PXLibCore.Extensions.Json;
 using PXLibCore.Helpers;
 using System;
 using System.Collections.Generic;
@@ -49,7 +51,7 @@ namespace WechatSDKCore.MPManager
             return result.ToObject<WechatUserInfoModel>();
         }
         /// <summary>
-        /// 校验签名
+        /// 校验签名  小程序签名校验经常第一次失败 第二次成功 前端要检查session_key是否在有效期内
         /// </summary>
         /// <param name="rawData">公开用户资料</param>
         /// <param name="signature">公开资料携带的签名信息</param>
@@ -74,5 +76,22 @@ namespace WechatSDKCore.MPManager
             string result = SecurityHelper.AESDecryptString(input.encryptedData, input.iv, model.session_key);
             return result.ToObject<PhoneNumModel>();
         }
+        /// <summary>
+        /// 发送订阅消息
+        /// </summary>
+        /// <param name="access_token"></param>
+        /// <param name="input"></param>
+        /// <returns></returns>
+        public async Task SendSubscribeMsg(string access_token,SendSubscribeInputDto input) 
+        {
+            string url = "https://api.weixin.qq.com/cgi-bin/message/subscribe/send?access_token={0}".FormatWith(access_token);
+            string jsonRes = await WebHelper.HttpPostAsync(url, input.ToJson(),null);
+            JObject jObject = jsonRes.ToJObject();
+            if (jObject["errcode"].ToInt() != 0) 
+            {
+                throw new Exception(jObject["errmsg"].ToString());
+            }
+        }
+
     }
 }

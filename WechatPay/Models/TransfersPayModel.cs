@@ -21,7 +21,7 @@ namespace WechatSDKCore.WechatPay.Models
         public string spbill_create_ip { get; set; }//可以为客户端或者服务端的IP
         public string desc { get; set; }//必传 理赔 提现 转账等描述
 
-        public PackageParamModel GetTransfersApiParameters()
+        public PackageParamModel GetApiParameters()
         {
             PackageParamModel apiParam = new PackageParamModel();
             apiParam.AddValue("partner_trade_no", partner_trade_no);

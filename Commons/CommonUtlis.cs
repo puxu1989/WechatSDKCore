@@ -100,5 +100,6 @@ namespace WechatSDKCore.Commons
                 .Select(m => m.Key + "=" + m.Value)) + "&key=" + appKey;//拼接加密参数
             return signStr.ToMd5();
         }
+       
     }
 }
