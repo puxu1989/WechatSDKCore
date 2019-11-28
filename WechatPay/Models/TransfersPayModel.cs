@@ -12,7 +12,7 @@ namespace WechatSDKCore.WechatPay.Models
     {
         public string openid { get; set; }
 
-        public int amount { get; set; }
+        public int amount { get; set; }//金额限制由商户平台不同而不同 默认最低0.3 最高5000
 
         public string partner_trade_no { get; set; }//商户订单号
 

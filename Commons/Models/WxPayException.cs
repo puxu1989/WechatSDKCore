@@ -4,7 +4,7 @@ using System.Text;
 
 namespace WechatSDKCore.Commons.Models
 {
-    class WxPayException:Exception
+   public class WxPayException:Exception
     {
         public WxPayException(string msg) : base(msg)
         {

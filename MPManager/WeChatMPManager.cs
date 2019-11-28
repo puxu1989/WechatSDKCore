@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json.Linq;
+using PXLibCore.Base.Application;
 using PXLibCore.Extensions;
 using PXLibCore.Extensions.Json;
 using PXLibCore.Helpers;
@@ -77,7 +78,7 @@ namespace WechatSDKCore.MPManager
             return result.ToObject<PhoneNumModel>();
         }
         /// <summary>
-        /// 发送订阅消息
+        /// 发送订阅消息  如thing长度不能大于20 注意其他类型的长度限制 否则发送订阅消息失败
         /// </summary>
         /// <param name="access_token"></param>
         /// <param name="input"></param>
@@ -85,12 +86,13 @@ namespace WechatSDKCore.MPManager
         public async Task SendSubscribeMsg(string access_token,SendSubscribeInputDto input) 
         {
             string url = "https://api.weixin.qq.com/cgi-bin/message/subscribe/send?access_token={0}".FormatWith(access_token);
-            string jsonRes = await WebHelper.HttpPostAsync(url, input.ToJson(),null);
-            JObject jObject = jsonRes.ToJObject();
-            if (jObject["errcode"].ToInt() != 0) 
-            {
-                throw new Exception(jObject["errmsg"].ToString());
-            }
+            await WebHelper.HttpPostAsync(url, input.ToJson(), null);//批量操作不处理异常和结果
+            //string jsonRes = await WebHelper.HttpPostAsync(url, input.ToJson(),null);
+            //JObject jObject = jsonRes.ToJObject();
+            //if (jObject["errcode"].ToInt() != 0) 
+            //{
+            //    throw new ExceptionEx(jObject["errmsg"].ToString());
+            //}
         }
 
     }

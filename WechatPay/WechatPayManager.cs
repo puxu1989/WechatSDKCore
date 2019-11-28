@@ -42,7 +42,7 @@ namespace WechatSDKCore.WechatPay
             string nonceStr = CommonUtlis.GetNonceStr();
             var xmlPackage = this.CreatePayPackageAndGetPackageXml(payInput, nonceStr);
             string xmlResult = await WebHelper.HttpPostAsync(unifiedorderPayUrl, xmlPackage, null, 10);
-            string prepay_id = GetPrepayId(xmlResult);
+            string prepay_id = string.Format("prepay_id={0}", GetPrepayId(xmlResult));//坑
             return CreateJsApiPayReturnModel(nonceStr, prepay_id);
         }
 
@@ -94,8 +94,43 @@ namespace WechatSDKCore.WechatPay
             return model;//最终返回前端的参数
         }
         #endregion
+        #region  订单查询
+        /// <summary>
+        /// 该接口提供所有微信支付订单的查询，商户可以通过查询订单接口主动查询订单状态，完成下一步的业务逻辑。
+        /// </summary>
+        /// <param name="transaction_id">商户订单号out_trade_no二选一</param>
+        /// <returns></returns>
+        public async Task<bool> QueryOrder(string transaction_id) 
+        {
+            string url = "   https://api.mch.weixin.qq.com/pay/orderquery";
+            PackageParamModel packageDic = new PackageParamModel();
+            packageDic.AddValue("appid", this._appId);//应用ID 
+            packageDic.AddValue("mch_id", this._mchId);//商户号 
+            packageDic.AddValue("transaction_id", transaction_id);//商户号 
+            packageDic.AddValue("nonce_str", CommonUtlis.GetNonceStr());
+            packageDic.AddValue("sign_type", this._signType);
+            packageDic.AddValue("sign", CommonUtlis.GetMD5Sign(packageDic, this._appKey));//签名
+            string xmlPackage = packageDic.ToXml();
+            string response = await WebHelper.HttpPostAsync(url, xmlPackage,null,10);
+            PackageParamModel newResult = new PackageParamModel();
+            newResult.FromXml(response);
+            if (newResult.GetValue("return_msg").ToString() == "OK") 
+            {
+                return true;
+            }
+            return false;
+        }
+     
+        #endregion
         #region  提现转账到零钱
-        public async Task<TransfersReturnModel> SubmitTransfers(TransfersPayModel inputData)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="inputData"></param>
+        /// <param name="certPathName">证书地址 最好不要放到网站目录</param>
+        /// <param name="certPwd">默认是商户号(坑) 不是管理证书的密码</param>
+        /// <returns></returns>
+        public async Task<TransfersReturnModel> SubmitTransfers(TransfersPayModel inputData,string certPathName,string certPwd)
         {
             var url = "https://api.mch.weixin.qq.com/mmpaymkttransfers/promotion/transfers";
             PackageParamModel packageParam = inputData.GetApiParameters();
@@ -104,7 +139,7 @@ namespace WechatSDKCore.WechatPay
             packageParam.AddValue("nonce_str", CommonUtlis.GetNonceStr());//随机字符串
             packageParam.AddValue("sign", CommonUtlis.GetMD5Sign(packageParam, this._appKey));//签名
             string xmlPackage = packageParam.ToXml();
-            string response = await WebHelper.HttpPostCertAsync(url, xmlPackage, "", "", 10);//证书默认密码为微信商户号
+            string response = await WebHelper.HttpPostCertAsync(url, xmlPackage, certPathName, certPwd, 10);//证书默认密码为微信商户号
             PackageParamModel newResult = new PackageParamModel();
             newResult.FromXml(response);
             if (newResult.GetValue("result_code").ToString().ToUpper() == "SUCCESS")

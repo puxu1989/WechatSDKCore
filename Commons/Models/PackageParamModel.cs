@@ -7,7 +7,7 @@ namespace WechatSDKCore.Commons.Models
 {
     /// <summary>
     /// 微信支付协议接口数据类，所有的API接口通信都依赖这个数据结构，
-    /// 在调用接口之前先填充各个字段的值，然后进行接口通信，
+    /// 在调用接口之前先填充各个字段的值，只支出int和string然后进行接口通信，
     /// 这样设计的好处是可扩展性强，用户可随意对协议进行更改而不用重新设计数据结构，
     /// 还可以随意组合出不同的协议数据包，不用为每个协议设计一个数据包结构
     /// 整个微信支付基本采用xml格式 协议要求判断逻辑	 先判断协议字段返回，再判断业务返回，最后判断交易状态
@@ -28,6 +28,14 @@ namespace WechatSDKCore.Commons.Models
                 return o;
             else
                 return string.Empty;
+        }
+        public bool IsSet(string key)
+        {
+            _values.TryGetValue(key, out object o);
+            if (null != o)
+                return true;
+            else
+                return false;
         }
         public SortedDictionary<string, object> GetValues()
         {

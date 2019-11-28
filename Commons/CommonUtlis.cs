@@ -83,7 +83,7 @@ namespace WechatSDKCore.Commons
         public static string GetTimestamp()
         {
             DateTime DateStart = new DateTime(1970, 1, 1, 8, 0, 0);
-            return (DateTime.Now - DateStart).TotalSeconds.ToString();
+            return Convert.ToInt64((DateTime.Now - DateStart).TotalSeconds).ToString();
         }
         /// <summary>
         /// 获取随机字符
