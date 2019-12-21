@@ -4,7 +4,7 @@ using System.Text;
 
 namespace WechatSDKCore.ShareManager
 {
-   public class ShareManager
+   public class WechatShareManager
     {
 
     }

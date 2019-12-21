@@ -6,14 +6,51 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using WechatSDKCore.AuthManager.Models;
 using WechatSDKCore.Commons.Models;
 
 namespace WechatSDKCore.Commons
 {
     public class CommonUtlis
     {
+        /// <summary>
+        /// 验证服务器是否有效 每个公众号就验证一次
+        /// </summary>
+        /// <param name="model"></param>
+        /// <param name="token"></param>
+        /// <returns></returns>
+        public static bool CheckServerSignature(ServerCheckModel model,string token)
+        {
+            if (model.signature.IsNullOrEmpty())
+                return false;
+            //创建数组，将 token, timestamp, nonce 三个参数加入数组
+            string[] array = { token, model.timestamp, model.nonce };         
+            Array.Sort(array);  //进行排序
+            string  tempStr = string.Join("", array);            //拼接为一个字符串
+            tempStr = GetSHA1(tempStr); 
+            return model.signature == tempStr;    //判断signature 是否正确
+        }
+        /// <summary>
+        /// 此方法的签名和SecurityHelper.GetSHA1少几位           注意微信的SHA1的签名坑
+        /// </summary>
+        /// <param name="strSource"></param>
+        /// <returns></returns>
+        public static string GetSHA1(string strSource)
+        {
+            string strResult = "";
+            using (SHA1 md5 = SHA1.Create())
+            {
+                byte[] bytResult = md5.ComputeHash(Encoding.UTF8.GetBytes(strSource));    //注意编码UTF8、UTF7、Unicode等的选择 
+                for (int i = 0; i < bytResult.Length; i++)  //字节类型的数组转换为字符串 
+                {
+                    strResult = strResult + bytResult[i].ToString("X");//16进制转换 
+                }
+                return strResult.ToLower();
+            }
+        }
         /// <summary>
         /// 获取AccessToken
         /// </summary>
@@ -100,6 +137,5 @@ namespace WechatSDKCore.Commons
                 .Select(m => m.Key + "=" + m.Value)) + "&key=" + appKey;//拼接加密参数
             return signStr.ToMd5();
         }
-       
     }
 }
