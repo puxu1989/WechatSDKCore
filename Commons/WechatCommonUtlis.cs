@@ -14,7 +14,7 @@ using WechatSDKCore.Commons.Models;
 
 namespace WechatSDKCore.Commons
 {
-    public class CommonUtlis
+    public class WechatCommonUtlis
     {
         /// <summary>
         /// 验证服务器是否有效 每个公众号就验证一次
@@ -46,7 +46,7 @@ namespace WechatSDKCore.Commons
                 byte[] bytResult = md5.ComputeHash(Encoding.UTF8.GetBytes(strSource));    //注意编码UTF8、UTF7、Unicode等的选择 
                 for (int i = 0; i < bytResult.Length; i++)  //字节类型的数组转换为字符串 
                 {
-                    strResult = strResult + bytResult[i].ToString("X");//16进制转换 
+                    strResult += bytResult[i].ToString("X");//16进制转换 
                 }
                 return strResult.ToLower();
             }
@@ -61,7 +61,9 @@ namespace WechatSDKCore.Commons
         {
             string url = $"https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid={appId}&secret={appSecret}";
             string resJson = await WebHelper.HttpGetAsync(url);
-            AccessTokenModel accessTokenModel = resJson.ToObject<AccessTokenModel>();
+            AccessTokenModel accessTokenModel = resJson.ToObject<AccessTokenModel>();//{"errcode":40164,"errmsg":"invalid ip 202.98.205.87 ipv6 ::ffff:202.98.205.87, not in whitelist hint: [li9tVA04332029]"}
+            if (accessTokenModel.access_token.IsNullOrEmpty())
+                throw new Exception(resJson);
             return accessTokenModel;
         }
         /// <summary>

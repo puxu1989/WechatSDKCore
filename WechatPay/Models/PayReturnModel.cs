@@ -15,5 +15,6 @@ namespace WechatSDKCore.WechatPay.Models
         public string package { get; set; }
         public string signType { get; set; }
         public string paySign { get; set; }
+        public string appId { get; set; }//公众号需要使用
     }
 }

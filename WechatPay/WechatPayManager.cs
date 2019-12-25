@@ -10,16 +10,13 @@ namespace WechatSDKCore.WechatPay
 {
     public class WechatPayManager
     {
-        private readonly string _appId;//支付应用（小程序）的appId 
+        public string AppId { get; set; }//支付应用（小程序）的appId  
         private readonly string _mchId;//商户的Id
         private readonly string _notifyUrl;//通知回调地址
         private readonly string _appKey;//用户在商户平台自定义的appKey
         private readonly string _signType = "MD5";
-        public WechatPayManager(string appId, string mchId, string appKey, string notifyUrl)
+        public WechatPayManager( string mchId, string appKey, string notifyUrl, string appId)
         {
-            _appId = appId;
-            if (string.IsNullOrEmpty(_appId))
-                throw new Exception("应用AppId不能为空");
             _mchId = mchId;
             if (string.IsNullOrEmpty(_mchId))
                 throw new Exception("商户平台的MchId不能为空");
@@ -29,20 +26,23 @@ namespace WechatSDKCore.WechatPay
             _appKey = appKey;
             if (string.IsNullOrEmpty(_appKey))
                 throw new Exception("商户平台自定义的AppKey不能为空");
+            AppId = appId;
+            if (string.IsNullOrEmpty(AppId))
+                throw new Exception("应用AppId不能为空");
         }
         #region JsApiUnified统一下单 提交支付
         /// <summary>
-        /// JsApiUnified统一下单 提交支付
+        /// JsApiUnified统一下单  JSAPI一般用于微信浏览器内支付 用于公众号和小程序
         /// </summary>
         /// <param name="payInput"></param>
         /// <returns></returns>
-        public async Task<PayReturnModel> SubmitJsApiUnifiedOrderPay(PayInputModel payInput)
+        public async Task<PayReturnModel> SubmitUnifiedOrderPay(PayInputModel payInput)
         {
             string unifiedorderPayUrl = "https://api.mch.weixin.qq.com/pay/unifiedorder";//统一支付地址
-            string nonceStr = CommonUtlis.GetNonceStr();
+            string nonceStr = WechatCommonUtlis.GetNonceStr();
             var xmlPackage = this.CreatePayPackageAndGetPackageXml(payInput, nonceStr);
             string xmlResult = await WebHelper.HttpPostAsync(unifiedorderPayUrl, xmlPackage, null, 10);
-            string prepay_id = string.Format("prepay_id={0}", GetPrepayId(xmlResult));//坑
+            string prepay_id = string.Format("prepay_id={0}", GetPrepayId(xmlResult));//坑3
             return CreateJsApiPayReturnModel(nonceStr, prepay_id);
         }
 
@@ -51,19 +51,27 @@ namespace WechatSDKCore.WechatPay
             int total_fee = Convert.ToInt32(payInput.TotalAmount * 100);
             //****************************************************************获取预支付订单编号***********************
             PackageParamModel packageDic = new PackageParamModel();
-            packageDic.AddValue("appid", this._appId);//应用ID 
+            packageDic.AddValue("appid", this.AppId);//应用ID 
             packageDic.AddValue("mch_id", this._mchId);//商户号 
-            packageDic.AddValue("openid", payInput.OpenId);//用户标识
             packageDic.AddValue("nonce_str", nonceStr);//随机字符串 
             packageDic.AddValue("body", payInput.Body);//商品描述 String(128) 做二次支付的时候订单号不能重复 如果要重复 第二次和第一次的商品描述要一样   package.Add("detail",body);//商品详细  
             packageDic.AddValue("out_trade_no", payInput.OrderId);//商户订单号 
             packageDic.AddValue("total_fee", total_fee);//支付总金额
             packageDic.AddValue("spbill_create_ip", WebHelper.GetRemoteIpAddress());//终端IP
             packageDic.AddValue("notify_url", this._notifyUrl);//通知地址
-            packageDic.AddValue("trade_type", "JSAPI");//交易类型 小程序使用此类型
+            packageDic.AddValue("trade_type", payInput.TradeType.GetEnumDescription());//交易类型 小程序使用此类型
             packageDic.AddValue("fee_type", "CNY");//币种，人民币  
             packageDic.AddValue("attach", payInput.Attach);//自定义参数  
-            var paySign = CommonUtlis.GetMD5Sign(packageDic, this._appKey);//使用Md5签名
+            if (payInput.TradeType == TradeType.JSAPI) 
+            {
+                if (payInput.OpenId.IsNullOrEmpty())
+                    throw new WxPayException("JSAPI必须指定OpenId");
+            }
+            if (!payInput.OpenId.IsNullOrEmpty()) 
+            {
+                packageDic.AddValue("openid", payInput.OpenId);//用户标识JSAPI毕传
+            }
+            var paySign = WechatCommonUtlis.GetMD5Sign(packageDic, this._appKey);//使用Md5签名
             packageDic.AddValue("sign", paySign);
             return packageDic.ToXml();
         }
@@ -75,21 +83,22 @@ namespace WechatSDKCore.WechatPay
         }
         private PayReturnModel CreateJsApiPayReturnModel(string nonceStr, string prepay_id)
         {
-            string timeStamp = CommonUtlis.GetTimestamp();
+            string timeStamp = WechatCommonUtlis.GetTimestamp();
             PackageParamModel packageDic = new PackageParamModel();//坑2 参数区分大小写 
-            packageDic.AddValue("appId", this._appId);// 注意这里的大小写 应用AppID 
+            packageDic.AddValue("appId", this.AppId);// 注意这里的大小写 应用AppID 
             packageDic.AddValue("timeStamp", timeStamp);
             packageDic.AddValue("nonceStr", nonceStr);
             packageDic.AddValue("package", prepay_id);
             packageDic.AddValue("signType", this._signType);
-            var paySign = CommonUtlis.GetMD5Sign(packageDic, this._appKey);//坑1 APPKey可能也有错 
+            var paySign = WechatCommonUtlis.GetMD5Sign(packageDic, this._appKey);//坑1 APPKey可能也有错 
             PayReturnModel model = new PayReturnModel
             {
                 timeStamp = timeStamp,
                 nonceStr = nonceStr,
                 package = prepay_id,
                 paySign = paySign,
-                signType = this._signType
+                signType = this._signType,
+                appId = AppId
             };
             return model;//最终返回前端的参数
         }
@@ -104,12 +113,12 @@ namespace WechatSDKCore.WechatPay
         {
             string url = "   https://api.mch.weixin.qq.com/pay/orderquery";
             PackageParamModel packageDic = new PackageParamModel();
-            packageDic.AddValue("appid", this._appId);//应用ID 
+            packageDic.AddValue("appid", this.AppId);//应用ID 
             packageDic.AddValue("mch_id", this._mchId);//商户号 
             packageDic.AddValue("transaction_id", transaction_id);//商户号 
-            packageDic.AddValue("nonce_str", CommonUtlis.GetNonceStr());
+            packageDic.AddValue("nonce_str", WechatCommonUtlis.GetNonceStr());
             packageDic.AddValue("sign_type", this._signType);
-            packageDic.AddValue("sign", CommonUtlis.GetMD5Sign(packageDic, this._appKey));//签名
+            packageDic.AddValue("sign", WechatCommonUtlis.GetMD5Sign(packageDic, this._appKey));//签名
             string xmlPackage = packageDic.ToXml();
             string response = await WebHelper.HttpPostAsync(url, xmlPackage,null,10);
             PackageParamModel newResult = new PackageParamModel();
@@ -133,10 +142,10 @@ namespace WechatSDKCore.WechatPay
         {
             var url = "https://api.mch.weixin.qq.com/mmpaymkttransfers/promotion/transfers";
             PackageParamModel packageParam = inputData.GetApiParameters();
-            packageParam.AddValue("mch_appid", this._appId);//公众账号ID?
+            packageParam.AddValue("mch_appid", this.AppId);//公众账号ID?
             packageParam.AddValue("mchid", this._mchId);//商户号
-            packageParam.AddValue("nonce_str", CommonUtlis.GetNonceStr());//随机字符串
-            packageParam.AddValue("sign", CommonUtlis.GetMD5Sign(packageParam, this._appKey));//签名
+            packageParam.AddValue("nonce_str", WechatCommonUtlis.GetNonceStr());//随机字符串
+            packageParam.AddValue("sign", WechatCommonUtlis.GetMD5Sign(packageParam, this._appKey));//签名
             string xmlPackage = packageParam.ToXml();
             string response = await WebHelper.HttpPostCertAsync(url, xmlPackage, certPathName, certPwd, 10);//证书默认密码为微信商户号
             PackageParamModel newResult = new PackageParamModel();
@@ -160,8 +169,8 @@ namespace WechatSDKCore.WechatPay
             string url = "https://api.mch.weixin.qq.com/mmpaysptrans/pay_bank";
             PackageParamModel packageParam = inputData.GetApiParameters(pubkey);
             packageParam.AddValue("mch_id", this._mchId);
-            packageParam.AddValue("nonce_str", CommonUtlis.GetNonceStr());
-            packageParam.AddValue("sign", CommonUtlis.GetMD5Sign(packageParam, this._appKey));
+            packageParam.AddValue("nonce_str", WechatCommonUtlis.GetNonceStr());
+            packageParam.AddValue("sign", WechatCommonUtlis.GetMD5Sign(packageParam, this._appKey));
             string xmlPackage = packageParam.ToXml();
             string response = await WebHelper.HttpPostCertAsync(url, xmlPackage, certFilePath, certPwd, 10);//证书默认密码为微信商户号
             PackageParamModel newResult = new PackageParamModel();
@@ -191,9 +200,9 @@ namespace WechatSDKCore.WechatPay
             string url = "https://fraud.mch.weixin.qq.com/risk/getpublickey";
             PackageParamModel packageParam = new PackageParamModel();
             packageParam.AddValue("mch_id", this._mchId);
-            packageParam.AddValue("nonce_str", CommonUtlis.GetNonceStr());
+            packageParam.AddValue("nonce_str", WechatCommonUtlis.GetNonceStr());
             packageParam.AddValue("sign_type", this._signType);
-            packageParam.AddValue("sign", CommonUtlis.GetMD5Sign(packageParam, this._appKey));//签名
+            packageParam.AddValue("sign", WechatCommonUtlis.GetMD5Sign(packageParam, this._appKey));//签名
             string xmlPackage = packageParam.ToXml();
             string response = await WebHelper.HttpPostCertAsync(url, xmlPackage, certPathName, certPwd, 10);//证书默认密码为微信商户号
             PackageParamModel newResult = new PackageParamModel();
