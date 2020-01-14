@@ -11,7 +11,7 @@ namespace WechatSDKCore.WechatPay.Models
         JSAPI=1,
         [Description("APP")]
         APP,
-        [Description("H5")]//尚未使用过
+        [Description("MWEB")] 
         H5
     }
 }

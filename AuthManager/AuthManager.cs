@@ -3,6 +3,7 @@ using PXLibCore.Extensions.Json;
 using PXLibCore.Helpers;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using WechatSDKCore.AuthManager.Models;
@@ -10,25 +11,36 @@ using WechatSDKCore.AuthManager.Models;
 namespace WechatSDKCore.AuthManager
 {
     /// <summary>
-    /// 公众号授权登录
+    /// 授权登录  支持公众号 APP
     /// </summary>
     public class WechatAuthManager
     {
-        public string AppId { get; set; }
-        public string AppSecret { get; set; }
-        public WechatAuthManager(string appId, string appSecret)
+        //public string AppId { get; set; }
+        //public string AppSecret { get; set; }
+        public List<AuthLoginProviderModel> Providers { get; }
+        //public WechatAuthManager(string appId, string appSecret)
+        //{
+        //    if (string.IsNullOrEmpty(appId))
+        //        throw new Exception("AppId不能为空");
+        //    this.AppId = appId;
+        //    if (string.IsNullOrEmpty(appSecret))
+        //        throw new Exception("ApSecret不能为空");
+        //    this.AppSecret = appSecret;
+        //}
+        public WechatAuthManager()
         {
-            if (string.IsNullOrEmpty(appId))
-                throw new Exception("AppId不能为空");
-            this.AppId = appId;
-            if (string.IsNullOrEmpty(appSecret))
-                throw new Exception("ApSecret不能为空");
-            this.AppSecret = appSecret;
+            Providers = new List<AuthLoginProviderModel>();
         }
-        //开发步骤 1.验证服务器是有有效 2.获取code 这两部直接在控制器或者api里调用 3.直接调用GetUserInfo
-        public async Task<AuthAccessTokenModel> GetAccessTokenAsync(string code, string grant_type = "authorization_code")
+        /// <summary>
+        ///  获取授权登录的AccessToken 开发步骤 1.验证服务器是有有效 2.获取code 这两部直接在控制器或者api里调用 3.直接调用GetUserInfo
+        /// </summary>
+        /// <param name="providerInfo"></param>
+        /// <param name="code"></param>
+        /// <param name="grant_type"></param>
+        /// <returns></returns>
+        public async Task<AuthAccessTokenModel> GetAccessTokenAsync(AuthLoginProviderModel providerInfo, string code, string grant_type = "authorization_code")
         {
-            string url = "https://api.weixin.qq.com/sns/oauth2/access_token?appid={0}&secret={1}&code={2}&grant_type={3}".FormatWith(AppId, AppSecret, code, grant_type);
+            string url = "https://api.weixin.qq.com/sns/oauth2/access_token?appid={0}&secret={1}&code={2}&grant_type={3}".FormatWith(providerInfo.AppId, providerInfo.AppSecret, code, grant_type);
             string resJson = await WebHelper.HttpGetAsync(url);
             AuthAccessTokenModel model = resJson.ToObject<AuthAccessTokenModel>();
             return model;
@@ -45,9 +57,14 @@ namespace WechatSDKCore.AuthManager
         /// </summary>
         /// <param name="code"></param>
         /// <returns></returns>
-        public async Task<AuthUserInfoModel> GetUserInfo(string code) 
+        public async Task<AuthUserInfoModel> GetUserInfo(string providerName, string code) 
         {
-            AuthAccessTokenModel tokenModel = await this.GetAccessTokenAsync(code);
+            var authLoginProviderModel = this.Providers.FirstOrDefault(p => p.ProviderName == providerName);
+            if (authLoginProviderModel == null) 
+            {
+                throw new Exception("未知的授权登录方式:" + providerName);
+            }
+            AuthAccessTokenModel tokenModel = await this.GetAccessTokenAsync(authLoginProviderModel,code);
             if (tokenModel.errcode == 0)
             {
                 var authUserInfo = await this.GetUserInfoByAccessTokenAsync(tokenModel.access_token, tokenModel.openid);

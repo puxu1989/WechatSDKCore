@@ -52,7 +52,7 @@ namespace WechatSDKCore.Commons
             }
         }
         /// <summary>
-        /// 获取AccessToken
+        /// 获取普通的AccessToken
         /// </summary>
         /// <param name="appId"></param>
         /// <param name="appSecret"></param>
