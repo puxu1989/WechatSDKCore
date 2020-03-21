@@ -16,5 +16,7 @@ namespace WechatSDKCore.WechatPay.Models
         public string signType { get; set; }
         public string paySign { get; set; }
         public string appId { get; set; }//公众号需要使用
+        public string prepayId { get; set; }//APP支付prepayId赋值给此字段 且package=Sign = WXPay，区别
+        public string partnerId { get; set; }//APP支付使用
     }
 }
