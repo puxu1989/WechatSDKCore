@@ -57,7 +57,7 @@ namespace WechatSDKCore.AuthManager
         /// </summary>
         /// <param name="code"></param>
         /// <returns></returns>
-        public async Task<AuthUserInfoModel> GetUserInfo(string providerName, string code) 
+        public async Task<AuthUserInfoModel> GetUserInfoAsync(string providerName, string code) 
         {
             var authLoginProviderModel = this.Providers.FirstOrDefault(p => p.ProviderName == providerName);
             if (authLoginProviderModel == null) 
