@@ -159,13 +159,13 @@ namespace WechatSDKCore.WechatPay
         #endregion
         #region  提现转账到零钱
         /// <summary>
-        /// 
+        ///  提现转账到零钱
         /// </summary>
         /// <param name="inputData"></param>
         /// <param name="certPathName">证书地址 最好不要放到网站目录</param>
         /// <param name="certPwd">默认是商户号(坑) 不是管理证书的密码</param>
         /// <returns></returns>
-        public async Task<TransfersReturnModel> SubmitTransfers(TransfersPayModel inputData, string certPathName, string certPwd)
+        public async Task<TransfersReturnModel> SubmitTransfersToWechatAccount(TransfersPayModel inputData, string certPathName, string certPwd)
         {
             var url = "https://api.mch.weixin.qq.com/mmpaymkttransfers/promotion/transfers";
             PackageParamModel packageParam = inputData.GetApiParameters();
@@ -175,6 +175,7 @@ namespace WechatSDKCore.WechatPay
             packageParam.AddValue("sign", WechatCommonUtlis.GetMD5Sign(packageParam, this._appKey));//签名
             string xmlPackage = packageParam.ToXml();
             string response = await WebHelper.HttpPostCertAsync(url, xmlPackage, certPathName, certPwd, 10);//证书默认密码为微信商户号
+            //这里会有一个错 The SSL connection could not be established 1证书导入计算机且配置商户号的ip.2.证书路径读取权限 3.发起的web请求可能与版本有关 本人装了2.1后莫名其解决了
             PackageParamModel newResult = new PackageParamModel();
             newResult.FromXml(response);
             if (newResult.GetValue("result_code").ToString().ToUpper() == "SUCCESS")

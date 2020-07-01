@@ -1,4 +1,6 @@
-﻿using PXLibCore.Extensions;
+﻿using Newtonsoft.Json.Linq;
+using PXLibCore.Base.Application;
+using PXLibCore.Extensions;
 using PXLibCore.Extensions.Json;
 using PXLibCore.Helpers;
 using System;
@@ -78,11 +80,28 @@ namespace WechatSDKCore.Commons
             TicketModel ticketModel = resJson.ToObject<TicketModel>();
             return ticketModel;
         }
+        /// <summary>
+        /// 微信签名算法  经过验证此签名和微信提供的测试签名工具是一样的 
+        /// </summary>
+        /// <param name="ticket"></param>
+        /// <param name="nonceStr"></param>
+        /// <param name="timestamp"></param>
+        /// <param name="link">分享链接，该链接域名或路径必须与当前页面对应的公众号JS安全域名一致 最容易出错的就是前段传来的url 必须保持两次一样 为避免出错 前端需要用js获取当前页面除去'#'hash部分的链接（可用location.href.split('#')[0]获取,而且需要encodeURIComponent）重点encodeURIComponent</param>
+        /// <returns></returns>
         public static string GetShareSignature(string ticket, string nonceStr, long timestamp, string link)
         {
             string param = "jsapi_ticket=" + ticket + "&noncestr=" + nonceStr + "&timestamp=" + timestamp + "&url=" + link;  //拼接字符串准备生成签名
             string signature = SecurityHelper.GetSHA1(param, Encoding.UTF8); //微信签名
             return signature;
+            /*
+             invalid signature签名错误。建议按如下顺序检查：
+            确认签名算法正确，可用http://mp.weixin.qq.com/debug/cgi-bin/sandbox?t=jsapisign 页面工具进行校验。
+            确认config中nonceStr（js中驼峰标准大写S）, timestamp与用以签名中的对应noncestr, timestamp一致。
+            确认url是页面完整的url(请在当前页面alert(location.href.split('#')[0])确认)，包括'http(s)://'部分，以及'？'后面的GET参数部分,但不包括'#'hash后面的部分。
+            确认 config 中的 appid 与用来获取 jsapi_ticket 的 appid 一致。
+            确保一定缓存access_token和jsapi_ticket。
+            确保你获取用来签名的url是动态获取的，动态页面可参见实例代码中php的实现方式。如果是html的静态页面在前端通过ajax将url传到后台签名，前端需要用js获取当前页面除去'#'hash部分的链接（可用location.href.split('#')[0]获取,而且需要encodeURIComponent），因为页面一旦分享，微信客户端会在你的链接末尾加入其它参数，如果不是动态获取当前链接，将导致分享后的页面签名失败。
+             */
         }
         /// <summary>
         /// 生成小程序二维码 如果成功 result直接是是纯图片流 不成功则result可以转换成json描述
@@ -113,6 +132,33 @@ namespace WechatSDKCore.Commons
             }.ToJson();
             byte[] result =await  WebHelper.HttpPostAsync(url, postData);
             return result;
+        }
+        /// <summary>
+        /// 敏感词检查
+        /// </summary>
+        /// <param name="content"></param>
+        /// <param name="accessToken"></param>
+        /// <returns></returns>
+        public static async Task<bool> ContentCheck(string content,string accessToken) 
+        {
+            //文档地址 https://mp.weixin.qq.com/cgi-bin/announce?action=getannouncement&key=&version=1&lang=zh_CN&platform=2
+            var url = string.Format("https://api.weixin.qq.com/wxa/msg_sec_check?access_token={0}", accessToken);
+            var postData = new
+            {
+                content
+            }.ToJson();
+           string result = await WebHelper.HttpPostAsync(url, postData,null);
+            JObject jObj = result.ToJObject();
+            int errcode = jObj["errcode"].ToInt();
+            if (errcode == 0)
+                return true;
+            else if (errcode == 87014)
+            {
+                throw new ExceptionEx("你输入的内容包含命名词汇");
+            }
+            else{
+                throw new Exception(jObj["errmsg"].ToString());
+            }
         }
         //====================================支付使用====================================
         /// <summary>  
