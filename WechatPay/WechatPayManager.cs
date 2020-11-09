@@ -64,12 +64,12 @@ namespace WechatSDKCore.WechatPay
             packageDic.AddValue("attach", payInput.Attach);//自定义参数  
             if (payInput.TradeType == TradeType.JSAPI)
             {
-                if (payInput.OpenId.IsNullOrEmpty())
+                if (payInput.OpenId.IsNullOrEmpty())//用户标识JSAPI毕传
                     throw new WxPayException("JSAPI必须指定OpenId");
             }
             if (!payInput.OpenId.IsNullOrEmpty())
             {
-                packageDic.AddValue("openid", payInput.OpenId);//用户标识JSAPI毕传
+                packageDic.AddValue("openid", payInput.OpenId);
             }
             var paySign = WechatCommonUtlis.GetMD5Sign(packageDic, this._appKey);//使用Md5签名
             packageDic.AddValue("sign", paySign);
@@ -93,7 +93,7 @@ namespace WechatSDKCore.WechatPay
             string package;
             if (tradeType == TradeType.JSAPI)
             {
-                packageDic.AddValue("appId", this.AppId);// 注意这里的大小写 应用AppID 
+                packageDic.AddValue("appId", this.AppId);// 注意这里的大小写 应用AppID 坑4
                 packageDic.AddValue("timeStamp", timeStamp);
                 packageDic.AddValue("nonceStr", nonceStr);
                 package = string.Format("prepay_id={0}", prepay_id);

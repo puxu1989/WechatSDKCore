@@ -42,8 +42,8 @@ namespace WechatSDKCore.AuthManager
         {
             string url = "https://api.weixin.qq.com/sns/oauth2/access_token?appid={0}&secret={1}&code={2}&grant_type={3}".FormatWith(providerInfo.AppId, providerInfo.AppSecret, code, grant_type);
             string resJson = await WebHelper.HttpGetAsync(url);
-            AuthAccessTokenModel model = resJson.ToObject<AuthAccessTokenModel>();
-            return model;
+            AuthAccessTokenModel tokenModel = resJson.ToObject<AuthAccessTokenModel>();
+            return tokenModel;
         }
         public async Task<AuthUserInfoModel> GetUserInfoByAccessTokenAsync(string access_token,string openid)//需scope为 snsapi_userinfo
         {
@@ -53,7 +53,7 @@ namespace WechatSDKCore.AuthManager
             return model;
         }
         /// <summary>
-        /// 通过code获取用户拉取微信授权登录信息 以上两步可以合为一步
+        /// 通过code获取用户拉取微信授权登录信息 以上两步可以合为一步 方便调用 但是返回errcode和系统自定义的不同步
         /// </summary>
         /// <param name="code"></param>
         /// <returns></returns>
@@ -70,7 +70,12 @@ namespace WechatSDKCore.AuthManager
                 var authUserInfo = await this.GetUserInfoByAccessTokenAsync(tokenModel.access_token, tokenModel.openid);
                 return authUserInfo;
             }
-            else 
+            else if (tokenModel.errcode == 40163 || tokenModel.errcode == 40029)
+            {
+                tokenModel.errmsg = "code已被使用或者无效";
+                throw new Exception(new { tokenModel.errcode, tokenModel.errmsg }.ToJson());
+            }
+            else
             {
                 throw new Exception(new { tokenModel.errcode, tokenModel.errmsg }.ToJson());
             }
