@@ -24,15 +24,15 @@ namespace WechatSDKCore.Commons
         /// <param name="model"></param>
         /// <param name="token"></param>
         /// <returns></returns>
-        public static bool CheckServerSignature(ServerCheckModel model,string token)
+        public static bool CheckServerSignature(ServerCheckModel model, string token)
         {
             if (model.signature.IsNullOrEmpty())
                 return false;
             //创建数组，将 token, timestamp, nonce 三个参数加入数组
-            string[] array = { token, model.timestamp, model.nonce };         
+            string[] array = { token, model.timestamp, model.nonce };
             Array.Sort(array);  //进行排序
-            string  tempStr = string.Join("", array);            //拼接为一个字符串
-            tempStr = GetSHA1(tempStr); 
+            string tempStr = string.Join("", array);            //拼接为一个字符串
+            tempStr = GetSHA1(tempStr);
             return model.signature == tempStr;    //判断signature 是否正确
         }
         /// <summary>
@@ -114,10 +114,10 @@ namespace WechatSDKCore.Commons
         /// <param name="line_color">auto_color 为 false 时生效，使用 rgb 设置颜色 例如 {"r":0,"g":0,"b":0} 十进制表示，默认全 0</param>
         /// <param name="is_hyaline">是否需要透明底色</param>
         /// <returns></returns>
-        public static async Task<byte[]> GetWXACodeUnlimitAsync(string accessToken,string scene, string page, int width=430, bool auto_color=true, object line_color =null, bool is_hyaline=false) 
+        public static async Task<byte[]> GetWXACodeUnlimitAsync(string accessToken, string scene, string page, int width = 430, bool auto_color = true, object line_color = null, bool is_hyaline = false)
         {
             var url = string.Format("https://api.weixin.qq.com/wxa/getwxacodeunlimit?access_token={0}", accessToken);
-            if (line_color == null || string.IsNullOrEmpty(line_color.ToString())) 
+            if (line_color == null || string.IsNullOrEmpty(line_color.ToString()))
             {
                 line_color = new { r = 0, g = 0, b = 0 };
             }
@@ -130,7 +130,7 @@ namespace WechatSDKCore.Commons
                 line_color,
                 is_hyaline,
             }.ToJson();
-            byte[] result =await  WebHelper.HttpPostAsync(url, postData);
+            byte[] result = await WebHelper.HttpPostAsync(url, postData);
             return result;
         }
         /// <summary>
@@ -139,7 +139,7 @@ namespace WechatSDKCore.Commons
         /// <param name="content"></param>
         /// <param name="accessToken"></param>
         /// <returns></returns>
-        public static async Task<bool> ContentCheck(string content,string accessToken) 
+        public static async Task<bool> ContentCheck(string content, string accessToken)
         {
             //文档地址 https://mp.weixin.qq.com/cgi-bin/announce?action=getannouncement&key=&version=1&lang=zh_CN&platform=2
             var url = string.Format("https://api.weixin.qq.com/wxa/msg_sec_check?access_token={0}", accessToken);
@@ -147,7 +147,7 @@ namespace WechatSDKCore.Commons
             {
                 content
             }.ToJson();
-           string result = await WebHelper.HttpPostAsync(url, postData,null);
+            string result = await WebHelper.HttpPostAsync(url, postData, null);
             JObject jObj = result.ToJObject();
             int errcode = jObj["errcode"].ToInt();
             if (errcode == 0)
@@ -156,10 +156,27 @@ namespace WechatSDKCore.Commons
             {
                 throw new ExceptionEx("你输入的内容包含命名词汇");
             }
-            else{
+            else
+            {
                 throw new Exception(jObj["errmsg"].ToString());
             }
         }
+        /// <summary>
+        /// 下发小程序和公众号统一的服务消息 新版使用该接口 小程序订阅发送那个接口已弃用
+        /// </summary>
+        /// <returns></returns>
+        public static async Task<string> SendUniformMessage(string access_token, UniformSendInputDto input)
+        {
+            string url = $"https://api.weixin.qq.com/cgi-bin/message/wxopen/template/uniform_send?access_token={access_token}";
+            string jsonRes = await WebHelper.HttpPostAsync(url, input.ToJson(), null);
+            JObject jObject = jsonRes.ToJObject();
+            if (jObject["errcode"].ToInt() != 0)
+            {
+                throw new ExceptionEx(jsonRes);
+            }
+            return jsonRes;
+        }
+
         //====================================支付使用====================================
         /// <summary>  
         /// 获取时间时间戳Timestamp  
@@ -174,9 +191,9 @@ namespace WechatSDKCore.Commons
         /// 获取随机字符
         /// </summary>
         /// <returns></returns>
-        public static string GetNonceStr() 
+        public static string GetNonceStr()
         {
-           return Guid.NewGuid().ToString("N");//32位
+            return Guid.NewGuid().ToString("N");//32位
         }
         public static string GetMD5Sign(PackageParamModel packageDic, string appKey)//这里就使用MD5加密 还有另外一个加密方式 HMAC-SHA256
         {

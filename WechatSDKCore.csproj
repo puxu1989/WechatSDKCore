@@ -10,7 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\PXLibCore\PXLibCore\PXLibCore.csproj" />
+    <ProjectReference Include="..\PXLibCore\PXLibCore.csproj" />
   </ItemGroup>
 
 </Project>

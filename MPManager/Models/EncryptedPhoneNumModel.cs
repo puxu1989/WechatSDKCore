@@ -12,5 +12,6 @@ namespace WechatSDKCore.MPManager.Models
         public string code { get; set; }
         public string encryptedData { get; set; }
         public string iv { get; set; }
+        public bool IsBingding { get; set; }
     }
 }

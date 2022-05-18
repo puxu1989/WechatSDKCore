@@ -34,7 +34,7 @@ namespace WechatSDKCore.MPManager
             return res.ToObject<OpenIdAndSessionKeyModel>();
         }
         /// <summary>  
-        ///小程序登录第一步 小程序直接拉去加密的用户信息  根据微信小程序平台提供的解密算法解密数据，推荐直接使用此方法  
+        ///小程序登录第一步 小程序直接拉去加密的用户信息  根据微信小程序平台提供的解密算法解密数据，推荐直接使用此方法  wx.getUserInfo获取rawData等
         /// </summary>  
         /// <param name="loginInfo">登陆信息</param>  
         /// <returns>用户信息</returns>  
@@ -49,7 +49,10 @@ namespace WechatSDKCore.MPManager
                 throw new Exception("signature校验失败");
             string result = SecurityHelper.AESDecryptString(input.encryptedData, input.iv, model.session_key);
             //反序列化结果，生成用户信息实例  
-            return result.ToObject<WechatUserInfoModel>();
+            WechatUserInfoModel userInfo= result.ToObject<WechatUserInfoModel>();
+            userInfo.openId = model.openid;
+            userInfo.unionId = model.unionid;
+            return userInfo;
         }
         /// <summary>
         /// 校验签名  小程序签名校验经常第一次失败 第二次成功 前端要检查session_key是否在有效期内
@@ -74,6 +77,10 @@ namespace WechatSDKCore.MPManager
             OpenIdAndSessionKeyModel model = await GetOpenIdAndSessionKeyAsync(input.code);
             if (model.errcode!=0)
                 throw new Exception($"获取session_key失败,code:{model.errcode} 信息:{model.errmsg}");
+            if (input.encryptedData.IsNullOrEmpty())
+                throw new Exception("encryptedData不能为空");
+            if (input.encryptedData.IsNullOrEmpty())
+                throw new Exception("iv不能为空");
             string result = SecurityHelper.AESDecryptString(input.encryptedData, input.iv, model.session_key);
             return result.ToObject<PhoneNumModel>();
         }
@@ -83,16 +90,17 @@ namespace WechatSDKCore.MPManager
         /// <param name="access_token"></param>
         /// <param name="input"></param>
         /// <returns></returns>
-        public async Task SendSubscribeMsg(string access_token,SendSubscribeInputDto input) 
+        public async Task<string> SendSubscribeMsg(string access_token,SendSubscribeInputDto input) 
         {
             string url = "https://api.weixin.qq.com/cgi-bin/message/subscribe/send?access_token={0}".FormatWith(access_token);
-            await WebHelper.HttpPostAsync(url, input.ToJson(), null);//批量操作不处理异常和结果
-            //string jsonRes = await WebHelper.HttpPostAsync(url, input.ToJson(),null);
-            //JObject jObject = jsonRes.ToJObject();
-            //if (jObject["errcode"].ToInt() != 0) 
-            //{
-            //    throw new ExceptionEx(jObject["errmsg"].ToString());
-            //}
+            //return await WebHelper.HttpPostAsync(url, input.ToJson(), null);//批量操作不处理异常和结果
+            string jsonRes = await WebHelper.HttpPostAsync(url, input.ToJson(), null);
+            JObject jObject = jsonRes.ToJObject();
+            if (jObject["errcode"].ToInt() != 0)
+            {
+                throw new ExceptionEx(jObject["errmsg"].ToString());
+            }
+            return jsonRes;
         }
 
     }
