@@ -54,7 +54,7 @@ namespace WechatSDKCore.Commons
             }
         }
         /// <summary>
-        /// 获取普通的AccessToken
+        /// 获取普通的AccessToken 
         /// </summary>
         /// <param name="appId"></param>
         /// <param name="appSecret"></param>
@@ -66,6 +66,23 @@ namespace WechatSDKCore.Commons
             AccessTokenModel accessTokenModel = resJson.ToObject<AccessTokenModel>();//{"errcode":40164,"errmsg":"invalid ip 202.98.205.87 ipv6 ::ffff:202.98.205.87, not in whitelist hint: [li9tVA04332029]"}
             if (accessTokenModel.access_token.IsNullOrEmpty())
                 throw new Exception(resJson);
+            return accessTokenModel;
+        }
+        /// <summary>
+        /// 从内存缓存里获取普通的AccessToken 
+        /// </summary>
+        /// <param name="appId"></param>
+        /// <param name="appSecret"></param>
+        /// <returns></returns>
+        public static async Task<AccessTokenModel> GetAccessTokenFromCacheAsync(string appId, string appSecret)
+        {
+             string cacheKey = "WechatAccessTokenCacheKey_"+ appId;
+            AccessTokenModel accessTokenModel = CacheHelper.GetCache<AccessTokenModel>(cacheKey);
+            if (accessTokenModel.IsNullOrEmpty())
+            {
+                accessTokenModel = await GetAccessTokenAsync(appId, appSecret);
+                CacheHelper.WriteCache(cacheKey, accessTokenModel, (accessTokenModel.expires_in - 60) / 60);
+            }
             return accessTokenModel;
         }
         /// <summary>
@@ -109,13 +126,20 @@ namespace WechatSDKCore.Commons
         /// <param name="accessToken"></param>
         /// <param name="scene">最大32个可见字符，只支持数字，大小写英文以及部分特殊字符</param>
         /// <param name="page">已经发布的小程序存在的页面（否则报错），例如 pages/index/index, 根路径前不要填加 /,不能携带参数（参数请放在scene字段里），如果不填写这个字段，默认跳主页面</param>
+        /// <param name="env_version"> "release"   否 要打开的小程序版本。正式版为 release，体验版为 trial，开发版为 develop</param>
         /// <param name="width">二维码的宽度，默认为 430px，最小 280px，最大 1280px</param>
         /// <param name="auto_color">自动配置线条颜色，如果颜色依然是黑色，则说明不建议配置主色调，默认 false</param>
         /// <param name="line_color">auto_color 为 false 时生效，使用 rgb 设置颜色 例如 {"r":0,"g":0,"b":0} 十进制表示，默认全 0</param>
         /// <param name="is_hyaline">是否需要透明底色</param>
         /// <returns></returns>
-        public static async Task<byte[]> GetWXACodeUnlimitAsync(string accessToken, string scene, string page, int width = 430, bool auto_color = true, object line_color = null, bool is_hyaline = false)
+        public static async Task<byte[]> GetWXACodeUnlimitAsync(string accessToken, string scene, string page, string env_version = "release", int width = 430, bool auto_color = true, object line_color = null, bool is_hyaline = false)
         {
+            bool check_path = true;
+            if (WebHelper.IsDevelopment())
+            {
+                env_version = "trial";
+                check_path = false;
+            }
             var url = string.Format("https://api.weixin.qq.com/wxa/getwxacodeunlimit?access_token={0}", accessToken);
             if (line_color == null || string.IsNullOrEmpty(line_color.ToString()))
             {
@@ -126,6 +150,8 @@ namespace WechatSDKCore.Commons
                 scene,
                 page,
                 width,
+                check_path,
+                env_version,
                 auto_color,
                 line_color,
                 is_hyaline,
@@ -162,7 +188,7 @@ namespace WechatSDKCore.Commons
             }
         }
         /// <summary>
-        /// 下发小程序和公众号统一的服务消息 新版使用该接口 小程序订阅发送那个接口已弃用
+        /// 下发小程序和公众号统一的服务消息   小程序订阅发送在本接口里已经下线  公众号使用次接口
         /// </summary>
         /// <returns></returns>
         public static async Task<string> SendUniformMessage(string access_token, UniformSendInputDto input)
@@ -177,7 +203,7 @@ namespace WechatSDKCore.Commons
             return jsonRes;
         }
 
-        //====================================支付使用====================================
+        #region====================================支付使用签名====================================
         /// <summary>  
         /// 获取时间时间戳Timestamp  
         /// </summary>  
@@ -202,5 +228,79 @@ namespace WechatSDKCore.Commons
                 .Select(m => m.Key + "=" + m.Value)) + "&key=" + appKey;//拼接加密参数
             return signStr.ToMd5();
         }
+        #endregion
+
+        #region 新版公众号开发
+        /// <summary>
+        /// 批量获取帐号的关注者列表  一次拉取调用最多拉取10000个关注者的OpenID 取消关注后就不会拉取到了  排序和管理后台的排序并不一致
+        ///  用于用户取消关注后不在批量拉取的列表里 那以前取消的OpenId还在数据库里 方式1可使用服务器通知的方式获取最新的关注订阅状态
+        /// </summary>
+        /// <returns></returns>
+        public static async Task<List<string>> BatchGetOpenIdList(string accessToken, string nextOpenId = "")
+        {
+            List<string> list = new List<string>();
+            do
+            {
+                string url = "https://api.weixin.qq.com/cgi-bin/user/get?access_token={0}&next_openid={1}".FormatWith(accessToken, nextOpenId);
+                string result = await WebHelper.HttpGetAsync(url);
+                BatchOpenIdListModel obj = result.ToObject<BatchOpenIdListModel>();
+                if (obj.count != 0 && obj.data != null)
+                    list.AddRange(obj.data.openid);
+                nextOpenId = obj.next_openid;
+            } while (!nextOpenId.IsNullOrEmpty());
+            return list;
+        }
+        /// <summary>
+        /// 批量获取用户基本信息 每次最多100条  lang国家地区语言版本，zh_CN 简体，zh_TW 繁体，en 英语，默认为zh-CN
+        /// </summary>
+        /// <returns></returns>
+        public static async Task<List<SubscribeUserInfoModel>> BatchGetSubscribeUserInfo(string accessToken,List<string> openIds,string lang= "zh-CN")
+        {
+            if (openIds.IsNullOrEmpty())
+                return new List<SubscribeUserInfoModel>();//不为空好循环
+            string url = "https://api.weixin.qq.com/cgi-bin/user/info/batchget?access_token=" + accessToken;
+            List<object> postOendIdList = new();
+            foreach (var item in openIds) 
+            {
+                postOendIdList.Add(new { openid = item , lang });
+            }
+            string result = await WebHelper.HttpPostAsync(url, (new { user_list= postOendIdList }).ToJson(),null);
+            //如果混有其他公众号的openId会报错 {\"errcode\":40003,\"errmsg\":\"invalid openid hint: [igBd6BsQf-ooZIPA] rid: 62c27800-3132e7eb-4d784582\"
+            SubscribeUserInfoModelList infoList = result.ToObject<SubscribeUserInfoModelList>();
+            if (infoList.user_info_list== null)
+                throw new ExceptionEx(result);
+            return infoList.user_info_list;
+        }
+        /// <summary>
+        /// send发送订阅通知消息  是订阅通知 不是消息模板 接口不一样
+        /// </summary>
+        /// <returns></returns>
+        public static async Task SendPubSubscribeMessage(string access_token, PubSubscribeMessageInputDto input) 
+        {
+            string url = "https://api.weixin.qq.com/cgi-bin/message/subscribe/bizsend?access_token=" + access_token;
+            string jsonRes = await WebHelper.HttpPostAsync(url, input.ToJson(), null);
+            JObject jObject = jsonRes.ToJObject();
+            if (jObject["errcode"].ToInt() != 0)
+            {
+                throw new ExceptionEx(jObject.ToJson());
+            }
+        }
+        /// <summary>
+        /// 发送模板消息  
+        /// </summary>
+        /// <param name="access_token"></param>
+        /// <param name="input"></param>
+        /// <returns></returns>
+        public static async Task SendPubTemplateMessage(string access_token, PubTemplateMessageInputDto input)
+        {
+            string url = "https://api.weixin.qq.com/cgi-bin/message/template/send?access_token=" + access_token;
+            string jsonRes = await WebHelper.HttpPostAsync(url, input.ToJson(), null);
+            JObject jObject = jsonRes.ToJObject();
+            if (jObject["errcode"].ToInt() != 0)
+            {
+                throw new ExceptionEx(jObject.ToJson());
+            }
+        }
+        #endregion
     }
 }
