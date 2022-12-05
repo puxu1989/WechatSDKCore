@@ -14,7 +14,7 @@ namespace WechatSDKCore.Commons.Models
         public bool subscribe { get; set; }
         public string openid { get; set; }
         public string language{get;set;}
-        public string subscribe_time { get; set; }
+        public long subscribe_time { get; set; }
         public string unionid { get; set; }
         public string remark { get; set; }
         public string subscribe_scene { get; set; }

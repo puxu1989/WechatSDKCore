@@ -21,19 +21,14 @@ namespace WechatSDKCore.Commons
         /// <summary>
         /// 验证服务器是否有效 每个公众号就验证一次
         /// </summary>
-        /// <param name="model"></param>
-        /// <param name="token"></param>
         /// <returns></returns>
-        public static bool CheckServerSignature(ServerCheckModel model, string token)
+        public static bool CheckServerSignature(string signature, string timestamp, string nonce, string token)
         {
-            if (model.signature.IsNullOrEmpty())
+            if (signature.IsNullOrEmpty())
                 return false;
-            //创建数组，将 token, timestamp, nonce 三个参数加入数组
-            string[] array = { token, model.timestamp, model.nonce };
-            Array.Sort(array);  //进行排序
-            string tempStr = string.Join("", array);            //拼接为一个字符串
-            tempStr = GetSHA1(tempStr);
-            return model.signature == tempStr;    //判断signature 是否正确
+            string[] array = { token, timestamp, nonce };  //创建数组，将 token, timestamp, nonce 三个参数加入数组
+            Array.Sort(array);  //进行排序     
+            return signature == GetSHA1(string.Join("", array)); //拼接为一个字符串;判断signature 是否正确
         }
         /// <summary>
         /// 此方法的签名和SecurityHelper.GetSHA1少几位           注意微信的SHA1的签名坑
@@ -43,18 +38,17 @@ namespace WechatSDKCore.Commons
         public static string GetSHA1(string strSource)
         {
             string strResult = "";
-            using (SHA1 md5 = SHA1.Create())
+            using SHA1 md5 = SHA1.Create();
+            byte[] bytResult = md5.ComputeHash(Encoding.UTF8.GetBytes(strSource));    //注意编码UTF8、UTF7、Unicode等的选择 
+            for (int i = 0; i < bytResult.Length; i++)  //字节类型的数组转换为字符串 
             {
-                byte[] bytResult = md5.ComputeHash(Encoding.UTF8.GetBytes(strSource));    //注意编码UTF8、UTF7、Unicode等的选择 
-                for (int i = 0; i < bytResult.Length; i++)  //字节类型的数组转换为字符串 
-                {
-                    strResult += bytResult[i].ToString("X");//16进制转换 
-                }
-                return strResult.ToLower();
+                strResult += bytResult[i].ToString("X");//16进制转换 
             }
+            return strResult.ToLower();
+
         }
         /// <summary>
-        /// 获取普通的AccessToken 
+        /// 获取普通的AccessToken 公众号需要设置ip白名单 小程序不需要设置
         /// </summary>
         /// <param name="appId"></param>
         /// <param name="appSecret"></param>
@@ -69,14 +63,14 @@ namespace WechatSDKCore.Commons
             return accessTokenModel;
         }
         /// <summary>
-        /// 从内存缓存里获取普通的AccessToken 
+        /// 单点服务器从内存缓存里获取普通的access_token  如果多个服务公用 开发生产等 需要放在redis或者中间数据库 
         /// </summary>
         /// <param name="appId"></param>
         /// <param name="appSecret"></param>
         /// <returns></returns>
         public static async Task<AccessTokenModel> GetAccessTokenFromCacheAsync(string appId, string appSecret)
         {
-             string cacheKey = "WechatAccessTokenCacheKey_"+ appId;
+            string cacheKey = "WechatAccessTokenCacheKey_" + appId;
             AccessTokenModel accessTokenModel = CacheHelper.GetCache<AccessTokenModel>(cacheKey);
             if (accessTokenModel.IsNullOrEmpty())
             {
@@ -121,7 +115,36 @@ namespace WechatSDKCore.Commons
              */
         }
         /// <summary>
-        /// 生成小程序二维码 如果成功 result直接是是纯图片流 不成功则result可以转换成json描述
+        /// 该接口用于获取小程序码，适用于需要的码数量较少的业务场景。通过该接口生成的小程序码，永久有效，有数量限制，详见获取小程序码。
+        /// 与 createQRCode 总共生成的码数量限制为 100,000，请谨慎调用。官方解释 参数不同就是不同的一个码
+        /// </summary>
+        /// <param name="accessToken"></param>
+        /// <param name="path">扫码进入的小程序页面路径，最大长度 128 字节，不能为空；对于小游戏，可以只传入 query 部分，来实现传参效果，如：传入 "?foo=bar"，即可在 wx.getLaunchOptionsSync 接口中的 query 参数获取到 {foo:"bar"}</param>
+        /// <param name="width">默认430</param>
+        /// <param name="auto_color">默认值false；自动配置线条颜色，如果颜色依然是黑色，则说明不建议配置主色调</param>
+        /// <param name="line_color"></param>
+        /// <param name="is_hyaline">默认值false；是否需要透明底色，为 true 时，生成透明底色的小程序码</param>
+        /// <returns></returns>
+        public static async Task<byte[]> GetWXACode(string accessToken, string path,  int width = 430, bool auto_color = true, object line_color = null, bool is_hyaline = false)
+        {
+            var url = string.Format("https://api.weixin.qq.com/wxa/getwxacode?access_token={0}", accessToken);
+            if (line_color == null || string.IsNullOrEmpty(line_color.ToString()))
+            {
+                line_color = new { r = 0, g = 0, b = 0 };
+            }
+            var postData = new
+            {
+                path,
+                width,
+                auto_color,
+                line_color,
+                is_hyaline,
+            }.ToJson();
+            byte[] result = await WebHelper.HttpPostAsync(url, postData);
+            return result;
+        }
+        /// <summary>
+        /// 无限制生成小程序二维码 如果成功 result直接是是纯图片流 不成功则result可以转换成json描述
         /// </summary>
         /// <param name="accessToken"></param>
         /// <param name="scene">最大32个可见字符，只支持数字，大小写英文以及部分特殊字符</param>
@@ -159,21 +182,16 @@ namespace WechatSDKCore.Commons
             byte[] result = await WebHelper.HttpPostAsync(url, postData);
             return result;
         }
+       
         /// <summary>
         /// 敏感词检查
         /// </summary>
-        /// <param name="content"></param>
-        /// <param name="accessToken"></param>
         /// <returns></returns>
-        public static async Task<bool> ContentCheck(string content, string accessToken)
+        public static async Task<bool> ContentCheck(string access_token,string content )
         {
             //文档地址 https://mp.weixin.qq.com/cgi-bin/announce?action=getannouncement&key=&version=1&lang=zh_CN&platform=2
-            var url = string.Format("https://api.weixin.qq.com/wxa/msg_sec_check?access_token={0}", accessToken);
-            var postData = new
-            {
-                content
-            }.ToJson();
-            string result = await WebHelper.HttpPostAsync(url, postData, null);
+            var url = string.Format("https://api.weixin.qq.com/wxa/msg_sec_check?access_token={0}", access_token);
+            string result = await WebHelper.HttpPostAsync(url, new{content}.ToJson(), null);
             JObject jObj = result.ToJObject();
             int errcode = jObj["errcode"].ToInt();
             if (errcode == 0)
@@ -187,22 +205,6 @@ namespace WechatSDKCore.Commons
                 throw new Exception(jObj["errmsg"].ToString());
             }
         }
-        /// <summary>
-        /// 下发小程序和公众号统一的服务消息   小程序订阅发送在本接口里已经下线  公众号使用次接口
-        /// </summary>
-        /// <returns></returns>
-        public static async Task<string> SendUniformMessage(string access_token, UniformSendInputDto input)
-        {
-            string url = $"https://api.weixin.qq.com/cgi-bin/message/wxopen/template/uniform_send?access_token={access_token}";
-            string jsonRes = await WebHelper.HttpPostAsync(url, input.ToJson(), null);
-            JObject jObject = jsonRes.ToJObject();
-            if (jObject["errcode"].ToInt() != 0)
-            {
-                throw new ExceptionEx(jsonRes);
-            }
-            return jsonRes;
-        }
-
         #region====================================支付使用签名====================================
         /// <summary>  
         /// 获取时间时间戳Timestamp  
@@ -231,6 +233,21 @@ namespace WechatSDKCore.Commons
         #endregion
 
         #region 新版公众号开发
+
+        /// <summary>
+        ///  单次获取用户基本信息（包括 UnionID 机制） 开发者可通过 OpenID 来获取用户基本信息。请使用 https 协议。
+        /// </summary>
+        /// <returns></returns>
+        public static async Task<SubscribeUserInfoModel> GetSubscribeUserInfo(string accessToken, string openId, string lang = "zh-CN")
+        {
+            string url = $"https://api.weixin.qq.com/cgi-bin/user/info?access_token={accessToken}&openid={openId}&lang={lang}";
+            string result = await WebHelper.HttpGetAsync(url);
+            SubscribeUserInfoModel obj = result.ToObject<SubscribeUserInfoModel>();
+            if (obj == null)
+                throw new ExceptionEx(result);
+            return obj;
+        }
+
         /// <summary>
         /// 批量获取帐号的关注者列表  一次拉取调用最多拉取10000个关注者的OpenID 取消关注后就不会拉取到了  排序和管理后台的排序并不一致
         ///  用于用户取消关注后不在批量拉取的列表里 那以前取消的OpenId还在数据库里 方式1可使用服务器通知的方式获取最新的关注订阅状态
@@ -254,20 +271,20 @@ namespace WechatSDKCore.Commons
         /// 批量获取用户基本信息 每次最多100条  lang国家地区语言版本，zh_CN 简体，zh_TW 繁体，en 英语，默认为zh-CN
         /// </summary>
         /// <returns></returns>
-        public static async Task<List<SubscribeUserInfoModel>> BatchGetSubscribeUserInfo(string accessToken,List<string> openIds,string lang= "zh-CN")
+        public static async Task<List<SubscribeUserInfoModel>> BatchGetSubscribeUserInfo(string accessToken, List<string> openIds, string lang = "zh-CN")
         {
             if (openIds.IsNullOrEmpty())
                 return new List<SubscribeUserInfoModel>();//不为空好循环
             string url = "https://api.weixin.qq.com/cgi-bin/user/info/batchget?access_token=" + accessToken;
             List<object> postOendIdList = new();
-            foreach (var item in openIds) 
+            foreach (var item in openIds)
             {
-                postOendIdList.Add(new { openid = item , lang });
+                postOendIdList.Add(new { openid = item, lang });
             }
-            string result = await WebHelper.HttpPostAsync(url, (new { user_list= postOendIdList }).ToJson(),null);
+            string result = await WebHelper.HttpPostAsync(url, (new { user_list = postOendIdList }).ToJson(), null);
             //如果混有其他公众号的openId会报错 {\"errcode\":40003,\"errmsg\":\"invalid openid hint: [igBd6BsQf-ooZIPA] rid: 62c27800-3132e7eb-4d784582\"
             SubscribeUserInfoModelList infoList = result.ToObject<SubscribeUserInfoModelList>();
-            if (infoList.user_info_list== null)
+            if (infoList.user_info_list == null)
                 throw new ExceptionEx(result);
             return infoList.user_info_list;
         }
@@ -275,7 +292,7 @@ namespace WechatSDKCore.Commons
         /// send发送订阅通知消息  是订阅通知 不是消息模板 接口不一样
         /// </summary>
         /// <returns></returns>
-        public static async Task SendPubSubscribeMessage(string access_token, PubSubscribeMessageInputDto input) 
+        public static async Task SendPubSubscribeMessage(string access_token, PubSubscribeMessageInputDto input)
         {
             string url = "https://api.weixin.qq.com/cgi-bin/message/subscribe/bizsend?access_token=" + access_token;
             string jsonRes = await WebHelper.HttpPostAsync(url, input.ToJson(), null);
@@ -286,7 +303,7 @@ namespace WechatSDKCore.Commons
             }
         }
         /// <summary>
-        /// 发送模板消息  
+        /// 发送模板消息    服务器有推送是否成功到设置的URL里
         /// </summary>
         /// <param name="access_token"></param>
         /// <param name="input"></param>
@@ -300,6 +317,40 @@ namespace WechatSDKCore.Commons
             {
                 throw new ExceptionEx(jObject.ToJson());
             }
+        }
+        /// <summary>
+        /// 提交自定义菜单 开启服务器配置后原来后台操作设置的菜单失效了 需要开发者主动提交
+        /// </summary>
+        /// <param name="access_token"></param>
+        /// <param name="input"></param>
+        /// <returns></returns>
+        public static async Task<string> SubmitMenu(string access_token, PostButtonInputDto input)
+        {
+            string url = "https://api.weixin.qq.com/cgi-bin/menu/create?access_token=" + access_token;
+            string jsonRes = await WebHelper.HttpPostAsync(url, input.ToJson(), null);
+            JObject jObject = jsonRes.ToJObject();
+            if (jObject["errcode"].ToInt() != 0)
+            {
+                throw new ExceptionEx(jObject.ToJson());
+            }
+            return jsonRes;
+        }
+        /// <summary>
+        /// 使用接口创建自定义菜单后，开发者还可使用接口删除当前使用的自定义菜单。另请注意，在个性化菜单时，调用此接口会删除默认菜单及全部个性化菜单。
+        /// </summary>
+        /// <param name="access_token"></param>
+        /// <param name="input"></param>
+        /// <returns></returns>
+        public static async Task<string> DeleteMenu(string access_token)
+        {
+            string url = "https://api.weixin.qq.com/cgi-bin/menu/delete?access_token=" + access_token;
+            string jsonRes = await WebHelper.HttpGetAsync(url);
+            JObject jObject = jsonRes.ToJObject();
+            if (jObject["errcode"].ToInt() != 0)
+            {
+                throw new ExceptionEx(jObject.ToJson());
+            }
+            return jsonRes;
         }
         #endregion
     }

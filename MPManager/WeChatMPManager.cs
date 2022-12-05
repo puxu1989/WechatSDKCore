@@ -25,9 +25,9 @@ namespace WechatSDKCore.MPManager
             this.AppSecret = appSecret;
         }
         /// <summary>
-        /// auth.code2Session 小程序拉去加密的用户信息里的code换取session 
+        /// auth.code2Session 小程序拉去加密的用户信息里的code换取session  新版小程序登录 
         /// </summary> 
-        private async Task<OpenIdAndSessionKeyModel> GetOpenIdAndSessionKeyAsync(string jscode) 
+        public async Task<OpenIdAndSessionKeyModel> GetOpenIdAndSessionKeyAsync(string jscode) 
         {
             string postUrl = $"https://api.weixin.qq.com/sns/jscode2session?appid={this.AppId}&secret={this.AppSecret}&js_code={jscode}&grant_type=authorization_code";
             string res = await WebHelper.HttpPostAsync(postUrl);
@@ -54,6 +54,8 @@ namespace WechatSDKCore.MPManager
             userInfo.unionId = model.unionid;
             return userInfo;
         }
+
+
         /// <summary>
         /// 校验签名  小程序签名校验经常第一次失败 第二次成功 前端要检查session_key是否在有效期内
         /// </summary>
@@ -76,6 +78,25 @@ namespace WechatSDKCore.MPManager
                 throw new Exception("获取手机号请求数据不能为空");
             OpenIdAndSessionKeyModel model = await GetOpenIdAndSessionKeyAsync(input.code);
             if (model.errcode!=0)
+                throw new Exception($"获取session_key失败,code:{model.errcode} 信息:{model.errmsg}");
+            if (input.encryptedData.IsNullOrEmpty())
+                throw new Exception("encryptedData不能为空");
+            if (input.encryptedData.IsNullOrEmpty())
+                throw new Exception("iv不能为空");
+            string result = SecurityHelper.AESDecryptString(input.encryptedData, input.iv, model.session_key);
+            return result.ToObject<PhoneNumModel>();
+        }
+        /// <summary>
+        /// 小程序获取手机号  废弃接口后使用此方法登录 
+        /// </summary>
+        /// <param name="input"></param>
+        /// <returns></returns>
+        public PhoneNumModel DecryptPhoneNumWithCodeReturnWXInfo(EncryptedPhoneNumModel input,out OpenIdAndSessionKeyModel model)
+        {
+            if (input == null)
+                throw new Exception("获取手机号请求数据不能为空");
+             model =  GetOpenIdAndSessionKeyAsync(input.code).Result;
+            if (model.errcode != 0)
                 throw new Exception($"获取session_key失败,code:{model.errcode} 信息:{model.errmsg}");
             if (input.encryptedData.IsNullOrEmpty())
                 throw new Exception("encryptedData不能为空");
